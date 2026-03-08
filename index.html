@@ -329,49 +329,6 @@ body.intro-active {
 }
 .del-btn:hover { border-color: rgba(255,80,80,.6); color: rgba(255,100,100,.9); background: rgba(255,50,50,.07); }
 
-/* admin login */
-.admin-bar {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  z-index: 8888;
-  background: rgba(10,0,18,.97);
-  border-top: 1px solid rgba(232,160,160,.15);
-  padding: 10px 20px;
-  display: flex; align-items: center; gap: 10px;
-  justify-content: center;
-}
-.admin-bar input {
-  background: rgba(255,255,255,.05);
-  border: 1px solid rgba(255,255,255,.1);
-  border-radius: 4px; padding: 8px 12px;
-  color: var(--cream); font-family:'DM Sans',sans-serif;
-  font-size: 12px; outline: none; width: 180px;
-  transition: border-color .2s;
-}
-.admin-bar input:focus { border-color: rgba(232,160,160,.4); }
-.admin-bar button {
-  background: rgba(232,160,160,.1);
-  border: 1px solid rgba(232,160,160,.25);
-  border-radius: 4px; padding: 8px 16px;
-  color: var(--rose-light); font-family:'DM Sans',sans-serif;
-  font-size: 12px; cursor: pointer; transition: all .2s;
-}
-.admin-bar button:hover { background: rgba(232,160,160,.2); }
-.admin-bar .admin-label {
-  font-size: 11px; color: var(--muted); letter-spacing:.15em;
-}
-.admin-bar.logged .admin-label { color: var(--gold); }
-.admin-logout {
-  font-size: 11px; color: rgba(255,100,100,.6);
-  cursor: pointer; text-decoration: underline;
-  background: none; border: none; font-family:'DM Sans',sans-serif;
-}
-.admin-logout:hover { color: rgba(255,100,100,.9); }
-
-/* admin badge on card */
-.admin-badge {
-  font-size: 9px; letter-spacing:.2em; text-transform:uppercase;
-  color: var(--gold); opacity:.6; margin-left:6px;
-}
 
 /* form */
 .c-form {
@@ -631,12 +588,6 @@ body.intro-active {
 
 <div class="toast" id="toast"></div>
 
-<!-- Admin bar -->
-<div class="admin-bar" id="adminBar">
-  <span class="admin-label" id="adminLabel">🔐 Admin</span>
-  <input type="password" id="adminPass" placeholder="Parol…" autocomplete="off"/>
-  <button id="adminLoginBtn">Kirish</button>
-</div>
 
 <script>
 // ── CURSOR
@@ -758,7 +709,6 @@ document.addEventListener('mousemove', e=>{ mx=e.clientX; my=e.clientY; });
 const SK  = '8mart-comments-v4';   // shared — hamma ko'radi
 const LK  = '8mart-liked-v4';
 const UIK = '8mart-uid-v4';        // user unique id
-const ADMIN_HASH = 'adm_8mart_2026_secure'; // Admin@8mart hashed token
 
 // User ID — har qurilmaga unikal
 function getUID(){
@@ -770,43 +720,7 @@ function getUID(){
 function getLiked(){ try{return JSON.parse(localStorage.getItem(LK)||'[]');}catch{return[];} }
 function saveLiked(a){ try{localStorage.setItem(LK,JSON.stringify(a));}catch{} }
 
-// Admin state
-let isAdmin = false;
-function checkAdmin(){ return isAdmin; }
 
-// Admin login
-document.getElementById('adminLoginBtn').addEventListener('click',()=>{
-  const pw = document.getElementById('adminPass').value;
-  if(pw === 'Admin@8mart'){
-    isAdmin = true;
-    document.getElementById('adminLabel').textContent = '✦ Admin rejimi';
-    document.getElementById('adminBar').classList.add('logged');
-    document.getElementById('adminPass').style.display='none';
-    document.getElementById('adminLoginBtn').style.display='none';
-    // logout button
-    const lb=document.createElement('button');
-    lb.className='admin-logout'; lb.textContent='Chiqish';
-    lb.addEventListener('click',()=>{
-      isAdmin=false;
-      document.getElementById('adminLabel').textContent='🔐 Admin';
-      document.getElementById('adminBar').classList.remove('logged');
-      document.getElementById('adminPass').style.display='';
-      document.getElementById('adminPass').value='';
-      document.getElementById('adminLoginBtn').style.display='';
-      lb.remove();
-      loadComments();
-    });
-    document.getElementById('adminBar').appendChild(lb);
-    showToast('Admin rejimiga kirdingiz ✦');
-    loadComments();
-  } else {
-    showToast('Parol noto\'g\'ri!');
-    document.getElementById('adminPass').style.borderColor='rgba(255,80,80,.5)';
-    setTimeout(()=>document.getElementById('adminPass').style.borderColor='',1500);
-  }
-});
-// Enter key on password
-document.getElementById('adminPass').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('adminLoginBtn').click(); });
 
 async function loadComments(){
   document.getElementById('cLoading').style.display='flex';
@@ -851,14 +765,14 @@ function render(cm){
   sorted.forEach((c,i)=>{
     const isLiked  = liked.includes(c.id);
     const isTop    = i===0 && c.likes>0;
-    const isOwner  = c.uid === myUID;   // shu comment menikimi?
-    const canDel   = isAdmin || isOwner; // o'chira oladimi?
+    const isOwner  = c.uid === myUID;
+    const canDel   = isOwner;
 
     const card = document.createElement('div');
     card.className = 'c-card';
     card.innerHTML = `
       <div class="c-head">
-        <span class="c-name">${esc(c.name)}${isAdmin?'<span class="admin-badge">uid:'+c.uid.slice(0,6)+'</span>':''}</span>
+        <span class="c-name">${esc(c.name)}</span>
         <span class="c-time">${ago(c.ts)}</span>
       </div>
       <div class="c-body">${esc(c.msg)}</div>
@@ -895,10 +809,9 @@ function render(cm){
       const id=btn.dataset.id;
       let cm2=[];
       try{ const r=await window.storage.get(SK,true); cm2=r?JSON.parse(r.value):[]; }catch{return;}
-      // Check again: admin or owner
       const target=cm2.find(c=>c.id===id);
       if(!target){ return; }
-      if(!isAdmin && target.uid !== getUID()){ showToast('Ruxsat yo\'q!'); return; }
+      if(target.uid !== getUID()){ showToast('Ruxsat yo\'q!'); return; }
       cm2=cm2.filter(c=>c.id!==id);
       await saveC(cm2); render(cm2);
       showToast('Comment o\'chirildi');
